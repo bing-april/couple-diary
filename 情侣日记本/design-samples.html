@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>情侣日记本 · 四个设计样本</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #f4f5f7;
+        color: #18202a;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+      header {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 34px 22px 12px;
+      }
+      h1 { margin: 0 0 8px; font-size: 34px; letter-spacing: 0; }
+      header p { margin: 0; color: #657080; font-size: 16px; }
+      .grid {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 20px 22px 46px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(220px, 1fr));
+        gap: 20px;
+      }
+      .sample {
+        background: #fff;
+        border: 1px solid #e1e5ea;
+        border-radius: 24px;
+        padding: 14px;
+        box-shadow: 0 18px 40px rgba(20, 31, 45, 0.08);
+      }
+      .phone {
+        height: 660px;
+        border-radius: 28px;
+        overflow: hidden;
+        border: 1px solid #dce2e8;
+        background: #fff;
+        position: relative;
+      }
+      .label { margin: 14px 4px 4px; font-weight: 800; }
+      .note { margin: 4px; color: #657080; font-size: 13px; line-height: 1.45; }
+      .bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 76px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        align-items: center;
+        border-top: 1px solid rgba(0,0,0,.08);
+        background: rgba(255,255,255,.94);
+        color: #8a93a0;
+        font-size: 12px;
+        text-align: center;
+      }
+      .bar strong { color: #1b2733; display: block; font-size: 20px; margin-bottom: 4px; }
+      .fab {
+        position: absolute;
+        right: 22px;
+        bottom: 94px;
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 28px;
+        font-weight: 600;
+        box-shadow: 0 14px 30px rgba(25, 98, 180, .24);
+      }
+      .a { background: #fbfcfd; padding: 28px 22px 90px; }
+      .a h2, .b h2, .c h2, .d h2 { margin: 0; font-size: 30px; }
+      .a .date { color: #778291; margin: 8px 0 26px; }
+      .entry-line { display: grid; grid-template-columns: 56px 1fr; gap: 16px; border-top: 1px solid #edf0f3; padding: 18px 0; }
+      .entry-line .day { text-align: center; color: #9aa3ae; }
+      .entry-line .day strong { display: block; color: #17202a; font-size: 28px; }
+      .entry-line h3 { margin: 0 0 8px; font-size: 17px; }
+      .entry-line p { margin: 0; color: #687483; line-height: 1.5; font-size: 14px; }
+      .a .fab { background: #1478ff; }
+      .b { background: #101318; color: white; padding: 24px 18px 90px; }
+      .b .hero {
+        height: 210px;
+        border-radius: 22px;
+        background:
+          linear-gradient(rgba(18,22,28,.08), rgba(18,22,28,.44)),
+          url("/Users/bingting/Desktop/情侣日记本/Screenshot 2026-05-02 at 11.34.58.png");
+        background-size: cover;
+        background-position: center;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+      }
+      .b .hero h2 { font-size: 27px; text-shadow: 0 2px 12px rgba(0,0,0,.28); }
+      .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+      .tile { height: 116px; border-radius: 18px; background: #242a32; padding: 12px; color: #cbd3dd; font-size: 13px; display: flex; align-items: flex-end; }
+      .tile:nth-child(1) { background: #28384d; }
+      .tile:nth-child(2) { background: #4b3a52; }
+      .tile:nth-child(3) { background: #28453e; }
+      .tile:nth-child(4) { background: #594937; }
+      .b .bar { background: rgba(16,19,24,.94); color: #6f7885; border-color: rgba(255,255,255,.12); }
+      .b .bar strong { color: white; }
+      .b .fab { background: #0a84ff; }
+      .c { background: #f8fafc; padding: 28px 22px 90px; }
+      .streak { display: flex; gap: 7px; margin: 20px 0 24px; }
+      .streak span { flex: 1; height: 36px; border-radius: 12px; background: #e9edf3; display: grid; place-items: center; font-size: 12px; color: #697586; }
+      .streak .on { background: #1f8f66; color: white; }
+      .prompt { background: #eef6ff; border: 1px solid #d9eaff; border-radius: 20px; padding: 18px; margin-bottom: 18px; }
+      .prompt b { color: #1466c3; }
+      .compact-card { background: white; border: 1px solid #e5eaf0; border-radius: 18px; padding: 16px; margin-bottom: 12px; }
+      .compact-card h3 { margin: 0 0 6px; font-size: 16px; }
+      .compact-card p { margin: 0; color: #6a7481; font-size: 14px; }
+      .c .fab { background: #1f8f66; }
+      .d { background: #fff; padding: 28px 18px 90px; }
+      .month { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin-top: 24px; }
+      .month span { aspect-ratio: 1; border-radius: 14px; background: #f1f3f5; display: grid; place-items: center; color: #697586; font-size: 12px; }
+      .month .photo { background:
+        linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.25)),
+        url("/Users/bingting/Desktop/情侣日记本/Screenshot 2026-05-02 at 11.35.26.png");
+        background-size: cover;
+        color: white;
+      }
+      .month .active { border: 2px solid #0a84ff; background: #eaf3ff; color: #0a66d6; }
+      .memory-strip { margin-top: 24px; border-top: 1px solid #edf0f3; padding-top: 18px; }
+      .memory-strip h3 { margin: 0 0 8px; }
+      .memory-strip p { margin: 0; color: #697586; font-size: 14px; line-height: 1.5; }
+      .d .fab { background: #0a84ff; }
+      @media (max-width: 980px) { .grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+      @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } .phone { height: 620px; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>四个 Day One 风格方向</h1>
+      <p>选 A、B、C 或 D。选好后我再把正式 App 改成那个方向。</p>
+    </header>
+    <section class="grid">
+      <article class="sample">
+        <div class="phone a">
+          <h2>Today</h2>
+          <div class="date">2026年5月2日 · 情侣日记本</div>
+          <div class="entry-line"><div class="day"><strong>02</strong>Sat</div><div><h3>补写今天的小事</h3><p>干净的时间线，文字优先，照片作为小缩略图出现。</p></div></div>
+          <div class="entry-line"><div class="day"><strong>01</strong>Fri</div><div><h3>第 100 天纪念</h3><p>像 Day One 的主列表，安静、轻、阅读感强。</p></div></div>
+          <div class="fab">+</div>
+          <div class="bar"><div><strong>□</strong>日记</div><div><strong>✧</strong>回溯</div><div><strong>▦</strong>日历</div><div><strong>⚙</strong>设置</div></div>
+        </div>
+        <div class="label">A · 经典时间线</div>
+        <p class="note">最接近 Day One 的日记列表，干净、克制、适合大量文字。</p>
+      </article>
+      <article class="sample">
+        <div class="phone b">
+          <div class="hero"><h2>满满的日记</h2><span>8 entries · 6 photos</span></div>
+          <div class="photo-grid"><div class="tile">劳动节笔记</div><div class="tile">想宝宝了</div><div class="tile">一起散步</div><div class="tile">纪念日</div></div>
+          <div class="fab">+</div>
+          <div class="bar"><div><strong>□</strong>日记</div><div><strong>✧</strong>回溯</div><div><strong>▦</strong>日历</div><div><strong>⚙</strong>设置</div></div>
+        </div>
+        <div class="label">B · 图片沉浸</div>
+        <p class="note">更重照片和封面氛围，适合你们经常添加图片的日记本。</p>
+      </article>
+      <article class="sample">
+        <div class="phone c">
+          <h2>Journal</h2>
+          <div class="streak"><span>一</span><span class="on">二</span><span class="on">三</span><span>四</span><span class="on">五</span><span>六</span><span>日</span></div>
+          <div class="prompt"><b>今日提示</b><br>今天最想和对方记住的一件事是什么？</div>
+          <div class="compact-card"><h3>我们在一起了</h3><p>2025年5月13日 · 开心 · 柏林</p></div>
+          <div class="compact-card"><h3>劳动节笔记</h3><p>2026年5月1日 · 大宝</p></div>
+          <div class="fab">+</div>
+          <div class="bar"><div><strong>□</strong>日记</div><div><strong>✧</strong>回溯</div><div><strong>▦</strong>日历</div><div><strong>⚙</strong>设置</div></div>
+        </div>
+        <div class="label">C · 习惯与提示</div>
+        <p class="note">有连续记录感、每日提示，比较像“每天写一点”的陪伴工具。</p>
+      </article>
+      <article class="sample">
+        <div class="phone d">
+          <h2>May 2026</h2>
+          <div class="month">
+            <span>26</span><span>27</span><span>28</span><span>29</span><span class="photo">30</span><span class="photo">1</span><span class="active">2</span>
+            <span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            <span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
+          </div>
+          <div class="memory-strip"><h3>特别日子</h3><p>第 100 天纪念 · 1 年纪念日 · 有照片的日期直接露出画面。</p></div>
+          <div class="fab">+</div>
+          <div class="bar"><div><strong>□</strong>日记</div><div><strong>✧</strong>回溯</div><div><strong>▦</strong>日历</div><div><strong>⚙</strong>设置</div></div>
+        </div>
+        <div class="label">D · 日历优先</div>
+        <p class="note">把“哪天发生过什么”放到第一层，适合回看和纪念日。</p>
+      </article>
+    </section>
+  </body>
+</html>

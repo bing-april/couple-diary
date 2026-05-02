@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>导入旧日记</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f7f9fc;
+        color: #18202a;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+      main {
+        width: min(92vw, 560px);
+        background: white;
+        border: 1px solid #e4e9f0;
+        border-radius: 24px;
+        padding: 28px;
+        box-shadow: 0 18px 40px rgba(20, 31, 45, 0.08);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 28px;
+      }
+      p {
+        color: #657080;
+        line-height: 1.7;
+      }
+      button {
+        width: 100%;
+        border: 0;
+        border-radius: 16px;
+        background: #0a84ff;
+        color: white;
+        padding: 14px 18px;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #f1f4f8;
+        border-radius: 16px;
+        padding: 16px;
+        color: #354052;
+      }
+    </style>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="./config.js?v=1"></script>
+  </head>
+  <body>
+    <main>
+      <h1>导入旧日记</h1>
+      <p>这个页面会导入 <strong>migration-draft.json</strong> 里的 8 篇旧日记。它会检查重复项，已经存在的日记会跳过。</p>
+      <button id="import-button" type="button">开始导入</button>
+      <pre id="result">请先确保你已经在主 App 登录，并且 Supabase 已运行导入函数 SQL。</pre>
+    </main>
+    <script>
+      const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG;
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const result = document.querySelector("#result");
+
+      document.querySelector("#import-button").addEventListener("click", async () => {
+        result.textContent = "正在检查登录状态...";
+        const { data: sessionData } = await client.auth.getSession();
+        if (!sessionData.session) {
+          result.textContent = "还没有登录。请先打开主 App 登录，再回到这个页面导入。";
+          return;
+        }
+
+        result.textContent = "正在读取迁移草稿...";
+        const entries = await fetch("./migration-draft.json").then((response) => response.json());
+
+        result.textContent = "正在查找当前日记本...";
+        const { data: bookId, error: bookError } = await client.rpc("get_or_create_my_diary_book");
+        if (bookError) {
+          result.textContent = bookError.message;
+          return;
+        }
+
+        result.textContent = "正在导入，请稍等...";
+        const { data, error } = await client.rpc("import_legacy_entries", {
+          target_book_id: bookId,
+          entries,
+        });
+
+        if (error) {
+          result.textContent = error.message;
+          return;
+        }
+
+        const summary = Array.isArray(data) ? data[0] : data;
+        result.textContent = `导入完成。\n新增：${summary.inserted_count} 篇\n跳过重复：${summary.skipped_count} 篇\n\n现在可以回到主 App 刷新查看。`;
+      });
+    </script>
+  </body>
+</html>
