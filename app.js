@@ -11,6 +11,9 @@ const state = {
   entries: [],
   members: [],
   calendarDate: new Date(),
+  selectedCalendarKey: formatDateKey(new Date()),
+  diaryFilter: "all",
+  darkMode: localStorage.getItem("coupleDiaryDarkMode") === "true",
   editingEntryId: null,
   collapsedGroups: new Set(),
   expandedEntries: new Set(),
@@ -18,15 +21,14 @@ const state = {
   viewerIndex: 0,
 };
 
-const colors = ["#a855f7", "#ec4899", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
 const themes = {
-  rose: { bg: "#f7f9fc", cardSoft: "#eef6ff", primary: "#0a84ff", line: "#e4e9f0" },
-  pink: { bg: "#fff7fb", cardSoft: "#ffe8f3", primary: "#db2777", line: "#f6d7e6" },
-  sakura: { bg: "#fff8f8", cardSoft: "#ffecec", primary: "#f47288", line: "#f7dada" },
-  ink: { bg: "#f6f7fb", cardSoft: "#e9edf5", primary: "#1f2937", line: "#dfe4ee" },
-  sea: { bg: "#f2fbff", cardSoft: "#e1f3fa", primary: "#15536d", line: "#cfe8f1" },
+  rose: { primary: "#1683f7" },
+  pink: { primary: "#ff2d55" },
+  sakura: { primary: "#f75d9a" },
+  ink: { primary: "#1c1c1e" },
+  sea: { primary: "#39c9c1" },
 };
-const weekNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const cnWeekNames = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 
 const $ = (selector) => document.querySelector(selector);
@@ -96,6 +98,41 @@ function profileForAuthor(entry) {
   return member?.profiles || (entry.author_id === state.session?.user.id ? state.profile : null);
 }
 
+function authorBadge(entry) {
+  return authorName(entry);
+}
+
+function ownerForEntry(entry) {
+  return authorName(entry).includes("小宝") ? "xiaobao" : "dabao";
+}
+
+function authorName(entry) {
+  const profile = profileForAuthor(entry) || {};
+  const displayName = profile.display_name || profile.email || "";
+  if (displayName.includes("小宝")) return "小宝";
+  if (displayName.includes("大宝")) return "大宝";
+
+  const currentName = state.profile?.display_name || "";
+  if (entry.author_id === state.session?.user.id && currentName.includes("小宝")) return "小宝";
+  return "大宝";
+}
+
+function entriesForDate(dateKey) {
+  return state.entries.filter((entry) => formatDateKey(entry.entry_date) === dateKey);
+}
+
+function formatEntryTime(date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function monthLabel(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
 function escapeHtml(value = "") {
   return value
     .replaceAll("&", "&amp;")
@@ -106,6 +143,7 @@ function escapeHtml(value = "") {
 }
 
 async function init() {
+  applyDarkMode(state.darkMode);
   bindEvents();
   const { data } = await client.auth.getSession();
   state.session = data.session;
@@ -120,21 +158,27 @@ function bindEvents() {
   $("#show-login").addEventListener("click", () => setAuthMode("login"));
   $("#show-signup").addEventListener("click", () => setAuthMode("signup"));
   $("#auth-form").addEventListener("submit", handleAuth);
-  $("#new-entry-button").addEventListener("click", openNewEntryDialog);
+  $("#top-new-entry-button").addEventListener("click", openNewEntryDialog);
   $("#close-dialog").addEventListener("click", closeEntryDialog);
+  $("#close-name-dialog").addEventListener("click", closeNameDialog);
   $("#entry-form").addEventListener("submit", saveEntry);
+  $("#name-form").addEventListener("submit", saveDisplayName);
   $("#entry-photos").addEventListener("change", previewSelectedPhotos);
   $("#diary-search-input").addEventListener("input", renderDiary);
+  $("#toggle-search").addEventListener("click", () => {
+    $("#diary-search").classList.toggle("open");
+    if ($("#diary-search").classList.contains("open")) $("#diary-search-input").focus();
+  });
   $("#close-image-viewer").addEventListener("click", closeImageViewer);
   $("#prev-image").addEventListener("click", () => showAdjacentImage(-1));
   $("#next-image").addEventListener("click", () => showAdjacentImage(1));
   $("#image-viewer").addEventListener("click", (event) => {
     if (event.target.id === "image-viewer") closeImageViewer();
   });
-  $("#save-anniversary").addEventListener("click", saveAnniversaryDate);
   $("#prev-month").addEventListener("click", () => changeMonth(-1));
   $("#next-month").addEventListener("click", () => changeMonth(1));
   $("#edit-name").addEventListener("click", editName);
+  $("#dark-mode-toggle").addEventListener("click", toggleDarkMode);
   $("#join-book").addEventListener("click", joinBook);
   $("#export-pdf").addEventListener("click", exportPdf);
   $("#logout").addEventListener("click", logout);
@@ -143,17 +187,30 @@ function bindEvents() {
     button.addEventListener("click", () => showPage(button.dataset.page));
   });
 
+  $$(".filter-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.diaryFilter = button.dataset.filter;
+      $$(".filter-chip").forEach((chip) => chip.classList.toggle("active", chip === button));
+      renderDiary();
+    });
+  });
+
   document.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-entry]");
     const deleteButton = event.target.closest("[data-delete-entry]");
     const imageButton = event.target.closest("[data-view-image]");
     const entryToggle = event.target.closest("[data-toggle-entry]");
     const groupToggle = event.target.closest("[data-toggle-group]");
+    const calendarDay = event.target.closest("[data-calendar-day]");
     if (editButton) openEditEntryDialog(editButton.dataset.editEntry);
     if (deleteButton) deleteEntry(deleteButton.dataset.deleteEntry);
     if (imageButton) openImageViewer(imageButton.dataset.viewImage, imageButton.dataset.imageGroup);
     if (entryToggle) toggleEntry(entryToggle.dataset.toggleEntry);
     if (groupToggle) toggleGroup(groupToggle.dataset.toggleGroup);
+    if (calendarDay) {
+      state.selectedCalendarKey = calendarDay.dataset.calendarDay;
+      renderCalendar();
+    }
   });
 }
 
@@ -297,26 +354,19 @@ function renderAll() {
 
 function renderProfile() {
   $("#profile-name").textContent = state.profile.display_name || "宝贝";
-  $("#profile-email").textContent = state.profile.email || state.session.user.email;
+  $("#profile-email").textContent = state.profile.email || state.session.user.email || "管理个人信息";
   $("#my-count").textContent = state.entries.filter((entry) => entry.author_id === state.session.user.id).length;
   $("#photo-count").textContent = state.entries.reduce((total, entry) => total + (entry.photos?.length || 0), 0);
   $("#book-code").value = state.bookId || "";
-
-  $("#color-picker").innerHTML = colors
-    .map(
-      (color) =>
-        `<button class="color-dot ${color.toLowerCase() === state.profile.diary_color?.toLowerCase() ? "active" : ""}" style="background:${color}" data-color="${color}" type="button" aria-label="选择颜色"></button>`
-    )
-    .join("");
-
-  $$(".color-dot").forEach((button) => button.addEventListener("click", () => updateColor(button.dataset.color)));
+  $("#dark-mode-status").textContent = state.darkMode ? "已开启" : "已关闭";
+  $("#dark-mode-toggle").classList.toggle("active", state.darkMode);
 
   $("#members-list").innerHTML = state.members
     .map((member) => {
       const profile = member.profiles || {};
-      return `<div class="member-pill"><span class="dot" style="background:${profile.diary_color || "#a855f7"}"></span>${escapeHtml(profile.display_name || profile.email || "未命名")} <span>${state.entries.filter((entry) => entry.author_id === member.user_id).length} 篇</span></div>`;
+      return `${escapeHtml(profile.display_name || profile.email || "未命名")} ${state.entries.filter((entry) => entry.author_id === member.user_id).length} 篇`;
     })
-    .join("");
+    .join(" · ");
 
   $$(".theme-chip").forEach((button) => {
     button.classList.toggle("active", button.dataset.theme === (state.profile.theme_name || "rose"));
@@ -330,11 +380,12 @@ function renderDiary() {
   const entries = state.entries.filter((entry) => {
     const profile = profileForAuthor(entry) || {};
     const text = `${entry.title || ""} ${entry.content || ""} ${entry.location || ""} ${entry.mood || ""} ${profile.display_name || ""} ${profile.email || ""}`.toLowerCase();
-    return text.includes(keyword);
+    const filterMatch = state.diaryFilter === "all" || ownerForEntry(entry) === state.diaryFilter;
+    return filterMatch && text.includes(keyword);
   });
 
   if (!state.entries.length) {
-    list.innerHTML = `<div class="empty">还没有日记。点右上角的笔，写下第一篇。</div>`;
+    list.innerHTML = `<div class="empty">还没有日记。点右上角的加号，写下第一篇。</div>`;
     return;
   }
 
@@ -355,21 +406,20 @@ function renderDiary() {
 
   list.innerHTML = Array.from(years.entries())
     .map(([year, months]) => {
-      const count = Array.from(months.values()).flat().length;
       const monthHtml = Array.from(months.entries())
         .map(([month, entries]) => {
           const key = `${year}-${month}`;
           const collapsed = state.collapsedGroups.has(key);
           return `
             <button class="month-toggle" data-toggle-group="${key}" type="button">
-              <span>${month} 月 <small>${entries.length} 篇</small></span>
+              <span>${month} 月</span>
               <span>${collapsed ? "⌄" : "⌃"}</span>
             </button>
             <div class="month-entries ${collapsed ? "collapsed" : ""}">${entries.map(renderEntryCard).join("")}</div>
           `;
         })
         .join("");
-      return `<section class="month-group"><button class="year-toggle" data-toggle-group="${year}" type="button"><span>${year} <small>${count} 篇</small></span><span>${state.collapsedGroups.has(String(year)) ? "⌄" : "⌃"}</span></button><div class="year-entries ${state.collapsedGroups.has(String(year)) ? "collapsed" : ""}">${monthHtml}</div></section>`;
+      return `<section class="month-group"><button class="year-toggle" data-toggle-group="${year}" type="button"><span>${year}</span><span>${state.collapsedGroups.has(String(year)) ? "⌄" : "⌃"}</span></button><div class="year-entries ${state.collapsedGroups.has(String(year)) ? "collapsed" : ""}">${monthHtml}</div></section>`;
     })
     .join("");
 }
@@ -380,31 +430,41 @@ function renderEntryCard(entry) {
   const canEdit = entry.author_id === state.session?.user.id;
   const photos = entry.photos || [];
   const title = entry.title?.trim();
-  const isLong = entry.content.length > 150 || entry.content.split("\n").length > 6;
+  const isLong = entry.content.length > 220 || entry.content.split("\n").length > 5;
   const expanded = state.expandedEntries.has(entry.id);
-  const preview = isLong && !expanded ? `${entry.content.slice(0, 150)}...` : entry.content;
+  const preview = entry.content;
+  const meta = [entry.mood, entry.location].filter(Boolean).map(escapeHtml).join(" ");
   return `
     <article class="entry-card">
       <div class="entry-date">
         <strong>${date.getDate()}</strong>
         <span>${weekNames[date.getDay()]}</span>
-        <span>${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}</span>
+        <time>${formatEntryTime(date)}</time>
       </div>
       <div class="entry-body">
-        <div class="author" style="color:${profile.diary_color || "#a855f7"}"><span class="dot" style="background:${profile.diary_color || "#a855f7"}"></span>${escapeHtml(profile.display_name || profile.email || "未命名")}</div>
+        <div class="entry-head">
+          <div class="author">
+            <span class="author-badge" style="background:${profile.diary_color || "var(--primary)"}">${authorBadge(entry)}</span>
+            ${meta ? `<span>${meta}</span>` : ""}
+            ${photos.length ? `<span>▧</span>` : ""}
+          </div>
+          ${
+            canEdit
+              ? `<div class="entry-actions">
+                  <button data-edit-entry="${entry.id}" type="button" aria-label="编辑日记">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"></path></svg>
+                  </button>
+                  <button data-delete-entry="${entry.id}" type="button" aria-label="删除日记">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                  </button>
+                </div>`
+              : ""
+          }
+        </div>
         ${title ? `<h4>${escapeHtml(title)}</h4>` : ""}
         <p class="${isLong && !expanded ? "entry-content collapsed-text" : "entry-content"}">${escapeHtml(preview)}</p>
         ${isLong ? `<button class="expand-button" data-toggle-entry="${entry.id}" type="button">${expanded ? "收起" : "展开"}</button>` : ""}
         ${photos.length ? `<div class="entry-photos">${photos.map((url) => `<button data-view-image="${escapeHtml(url)}" data-image-group="${entry.id}" type="button"><img src="${escapeHtml(url)}" alt="日记照片" /></button>`).join("")}</div>` : ""}
-        ${entry.mood || entry.location ? `<div class="entry-meta-row">${entry.mood ? `<span>♡ ${escapeHtml(entry.mood)}</span>` : ""}${entry.location ? `<span>⌖ ${escapeHtml(entry.location)}</span>` : ""}</div>` : ""}
-        ${
-          canEdit
-            ? `<div class="entry-actions">
-                <button data-edit-entry="${entry.id}" type="button">编辑</button>
-                <button data-delete-entry="${entry.id}" type="button">删除</button>
-              </div>`
-            : ""
-        }
       </div>
     </article>
   `;
@@ -412,45 +472,100 @@ function renderEntryCard(entry) {
 
 function renderMemory() {
   const startDate = defaultAnniversaryDate();
-  $("#anniversary-date").value = startDate;
+  const byYear = new Map();
+  state.entries.forEach((entry) => {
+    const year = new Date(entry.entry_date).getFullYear();
+    byYear.set(year, (byYear.get(year) || 0) + 1);
+  });
+  const yearStats = Array.from(byYear.entries())
+    .sort((a, b) => b[0] - a[0])
+    .slice(0, 3);
+  while (yearStats.length < 3) yearStats.push(["--", 0]);
+
+  const moodCounts = new Map();
+  state.entries.forEach((entry) => {
+    const mood = entry.mood?.trim() || "其他";
+    moodCounts.set(mood, (moodCounts.get(mood) || 0) + 1);
+  });
+  const moods = Array.from(moodCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+
   const filtered = state.entries
     .map((entry) => ({ ...entry, specialLabel: specialDayLabel(entry.entry_date, startDate) }))
     .filter((entry) => entry.specialLabel);
 
-  $("#memory-list").innerHTML =
-    filtered
-      .map((entry) => {
-        const date = new Date(entry.entry_date);
-        const profile = profileForAuthor(entry) || {};
-        const title = entry.title?.trim();
-        const isLong = entry.content.length > 150 || entry.content.split("\n").length > 6;
-        const expanded = state.expandedEntries.has(`memory-${entry.id}`);
-        const preview = isLong && !expanded ? `${entry.content.slice(0, 150)}...` : entry.content;
-        return `
-          <article class="memory-card">
-            <div class="ago">✧ ${escapeHtml(entry.specialLabel)} · ${daysAgo(entry.entry_date)} 天前</div>
-            <div class="body">
-              <time>${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${cnWeekNames[date.getDay()]} · ${escapeHtml(profile.display_name || profile.email || "未命名")}</time>
+  $("#memory-list").innerHTML = `
+    <article class="memory-stat">
+      <strong>${state.entries.length}</strong>
+      <p>条共同记忆</p>
+      <div class="memory-divider"></div>
+      <div class="year-stats">
+        ${yearStats.map(([year, count]) => `<div><strong>${count}</strong><span>${year}年</span></div>`).join("")}
+      </div>
+    </article>
+
+    <article class="memory-panel">
+      <h3>心情分布</h3>
+      <div class="mood-chips">
+        ${
+          moods.length
+            ? moods.map(([mood, count]) => `<span>${escapeHtml(mood)} ${Math.round((count / Math.max(state.entries.length, 1)) * 100)}%</span>`).join("")
+            : `<span>还没有心情记录</span>`
+        }
+      </div>
+    </article>
+
+    <article class="memory-panel">
+      <h3>本月亮点</h3>
+      <div class="highlights">
+        <div class="highlight"><span class="blue-dot"></span>共同回忆 ${state.entries.length} 条</div>
+        <div class="highlight"><span class="blue-dot"></span>照片记录 ${state.entries.reduce((total, entry) => total + (entry.photos?.length || 0), 0)} 张</div>
+        <div class="highlight"><span class="blue-dot"></span>最长日记 ${Math.max(0, ...state.entries.map((entry) => entry.content?.length || 0))} 字</div>
+      </div>
+    </article>
+
+    <article class="memory-panel">
+      <h3>纪念日起点</h3>
+      <div class="anniversary-tools">
+        <input id="anniversary-date" type="date" value="${escapeHtml(startDate)}" />
+        <button id="save-anniversary" type="button">保存</button>
+      </div>
+    </article>
+
+    ${
+      filtered
+        .map((entry) => {
+          const date = new Date(entry.entry_date);
+          const title = entry.title?.trim();
+          const isLong = entry.content.length > 220 || entry.content.split("\n").length > 5;
+          const expanded = state.expandedEntries.has(`memory-${entry.id}`);
+          const preview = entry.content;
+          return `
+            <article class="memory-card">
+              <div class="ago">${escapeHtml(entry.specialLabel)} · ${daysAgo(entry.entry_date)} 天前</div>
+              <time>${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${cnWeekNames[date.getDay()]}</time>
               ${title ? `<h3>${escapeHtml(title)}</h3>` : ""}
-              <p>${escapeHtml(preview)}</p>
+              <p class="${isLong && !expanded ? "collapsed-text" : ""}">${escapeHtml(preview)}</p>
               ${isLong ? `<button class="expand-button" data-toggle-entry="memory-${entry.id}" type="button">${expanded ? "收起" : "展开"}</button>` : ""}
-              ${entry.photos?.length ? `<div class="entry-photos">${entry.photos.map((url) => `<button data-view-image="${escapeHtml(url)}" data-image-group="${entry.id}" type="button"><img src="${escapeHtml(url)}" alt="日记照片" /></button>`).join("")}</div>` : ""}
-              ${entry.mood || entry.location ? `<div class="entry-meta-row">${entry.mood ? `<span>♡ ${escapeHtml(entry.mood)}</span>` : ""}${entry.location ? `<span>⌖ ${escapeHtml(entry.location)}</span>` : ""}</div>` : ""}
-            </div>
-          </article>
-        `;
-      })
-      .join("") || `<div class="empty">还没有特别日子的日记。设置纪念日起点后，第 100 天、200 天、1 年纪念日这类日记会出现在这里。</div>`;
+            </article>
+          `;
+        })
+        .join("") || ""
+    }
+  `;
+
+  $("#save-anniversary")?.addEventListener("click", saveAnniversaryDate);
 }
 
 function renderCalendar() {
   const date = state.calendarDate;
   const year = date.getFullYear();
   const month = date.getMonth();
-  $("#calendar-month").textContent = `${year}年 ${month + 1}月`;
+  $("#calendar-month").textContent = monthLabel(date);
 
   const firstDay = new Date(year, month, 1);
-  const start = new Date(year, month, 1 - firstDay.getDay());
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const entryDays = new Set(state.entries.map((entry) => formatDateKey(entry.entry_date)));
   const photoByDay = new Map();
   state.entries.forEach((entry) => {
@@ -462,23 +577,45 @@ function renderCalendar() {
   const todayKey = formatDateKey(new Date());
 
   const days = [];
-  for (let i = 0; i < 42; i += 1) {
-    const current = new Date(start);
-    current.setDate(start.getDate() + i);
+  for (let i = 0; i < firstDay.getDay(); i += 1) {
+    days.push(`<span></span>`);
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const current = new Date(year, month, day);
     const key = formatDateKey(current);
     const photo = photoByDay.get(key);
     days.push(`
-      <button class="calendar-day ${current.getMonth() !== month ? "out" : ""} ${entryDays.has(key) ? "has-entry" : ""} ${photo ? "photo-day" : ""} ${key === todayKey ? "today" : ""}" ${photo ? `style="background-image:url('${escapeHtml(photo)}')"` : ""} type="button">
+      <button class="calendar-day ${entryDays.has(key) ? "has-entry" : ""} ${photo ? "photo-day" : ""} ${key === todayKey ? "today" : ""} ${key === state.selectedCalendarKey ? "active" : ""}" data-calendar-day="${key}" ${photo ? `style="background-image:url('${escapeHtml(photo)}')"` : ""} type="button">
         <span>${current.getDate()}</span>
       </button>
     `);
   }
   $("#calendar-grid").innerHTML = days.join("");
+  renderCalendarSelected();
 }
 
 function changeMonth(offset) {
   state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() + offset, 1);
+  state.selectedCalendarKey = formatDateKey(state.calendarDate);
   renderCalendar();
+}
+
+function renderCalendarSelected() {
+  const selectedDate = new Date(`${state.selectedCalendarKey}T00:00:00`);
+  const entries = entriesForDate(state.selectedCalendarKey);
+  $("#calendar-selected").innerHTML = `
+    <div>${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日 ${weekNames[selectedDate.getDay()]}</div>
+    ${
+      entries.length
+        ? entries
+            .map((entry) => {
+              const title = entry.title?.trim() || "这天的日记";
+              return `<article class="calendar-mini-entry"><h3><span class="author-badge">${authorBadge(entry)}</span> ${escapeHtml(title)}</h3><p>${escapeHtml((entry.content || "").slice(0, 42))}${entry.content?.length > 42 ? "..." : ""}</p></article>`;
+            })
+            .join("")
+        : `<div class="calendar-mini-entry"><h3>这天还没有日记</h3><p>点右上角的加号，补写这一日。</p></div>`
+    }
+  `;
 }
 
 function showPage(page) {
@@ -616,6 +753,10 @@ function closeEntryDialog() {
   $("#entry-dialog").close();
 }
 
+function closeNameDialog() {
+  $("#name-dialog").close();
+}
+
 function previewSelectedPhotos() {
   const files = Array.from($("#entry-photos").files || []);
   $("#photo-preview").innerHTML = files.map((file) => `<span>${escapeHtml(file.name)}</span>`).join("");
@@ -646,7 +787,15 @@ async function deleteEntry(entryId) {
 }
 
 async function editName() {
-  const name = prompt("想显示什么名字？", state.profile.display_name || "宝贝");
+  $("#display-name-input").value = state.profile.display_name || "";
+  $("#name-dialog").showModal();
+  $("#display-name-input").focus();
+  $("#display-name-input").select();
+}
+
+async function saveDisplayName(event) {
+  event.preventDefault();
+  const name = $("#display-name-input").value.trim();
   if (!name) return;
   const { data, error } = await client.from("profiles").update({ display_name: name.trim() }).eq("id", state.session.user.id).select("*").single();
   if (error) {
@@ -654,6 +803,7 @@ async function editName() {
     return;
   }
   state.profile = data;
+  closeNameDialog();
   await loadAll();
 }
 
@@ -681,48 +831,38 @@ async function updateTheme(themeName) {
 
 function applyTheme(themeName) {
   const theme = themes[themeName === "paper" ? "rose" : themeName] || themes.rose;
-  document.documentElement.style.setProperty("--bg", theme.bg);
-  document.documentElement.style.setProperty("--card-soft", theme.cardSoft);
   document.documentElement.style.setProperty("--primary", theme.primary);
   document.documentElement.style.setProperty("--primary-strong", theme.primary);
-  document.documentElement.style.setProperty("--line", theme.line);
+}
+
+function toggleDarkMode() {
+  state.darkMode = !state.darkMode;
+  localStorage.setItem("coupleDiaryDarkMode", String(state.darkMode));
+  applyDarkMode(state.darkMode);
+  renderProfile();
+}
+
+function applyDarkMode(enabled) {
+  document.body.classList.toggle("dark-mode", enabled);
 }
 
 function exportPdf() {
-  const printWindow = window.open("", "_blank");
-  const entriesHtml = state.entries.map((entry) => {
-    const date = new Date(entry.entry_date);
-    const profile = profileForAuthor(entry) || {};
-    return `
-      <article>
-        ${entry.title?.trim() ? `<h2>${escapeHtml(entry.title.trim())}</h2>` : ""}
-        <p class="meta">${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${profile.display_name || profile.email || "未命名"}${entry.mood ? ` · ${escapeHtml(entry.mood)}` : ""}</p>
-        <p>${escapeHtml(entry.content).replaceAll("\n", "<br>")}</p>
-        ${entry.location ? `<p class="meta">地点：${escapeHtml(entry.location)}</p>` : ""}
-        ${entry.photos?.length ? `<div>${entry.photos.map((url) => `<img src="${escapeHtml(url)}" alt="日记照片">`).join("")}</div>` : ""}
-      </article>
-    `;
-  }).join("");
-  printWindow.document.write(`
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>情侣日记本导出</title>
-        <style>
-          body { font-family: Georgia, "Songti SC", serif; color: #3b232b; padding: 32px; }
-          h1 { font-size: 36px; }
-          article { break-inside: avoid; border-bottom: 1px solid #eadfe2; padding: 24px 0; }
-          img { max-width: 160px; border-radius: 12px; margin: 8px 8px 0 0; }
-          .meta { color: #8f747e; }
-        </style>
-      </head>
-      <body><h1>满满的日记</h1>${entriesHtml}</body>
-    </html>
-  `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
+  const backup = {
+    exported_at: new Date().toISOString(),
+    book: state.book,
+    profile: state.profile,
+    members: state.members,
+    entries: state.entries,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `couple-diary-backup-${formatDateKey(new Date())}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 async function joinBook() {

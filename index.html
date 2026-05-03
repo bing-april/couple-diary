@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>情侣日记本</title>
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=22" />
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=1"></script>
   </head>
@@ -38,132 +38,126 @@
 
       <section id="app-screen" class="screen app-screen hidden">
         <div class="content">
-          <section id="page-diary" class="page active">
-            <header class="page-header compact">
-              <div>
-                <h1>满满的日记</h1>
+          <section id="page-diary" class="page diary-page active">
+            <header class="topbar">
+              <h1 class="page-title">我们的日记</h1>
+              <div class="top-actions">
+                <button id="toggle-search" class="square-button" type="button" aria-label="搜索">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M16.5 16.5 21 21"></path></svg>
+                </button>
+                <button id="top-new-entry-button" class="square-button primary-square" type="button" aria-label="写日记">+</button>
               </div>
             </header>
-            <div class="diary-search">
-              <span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M16.5 16.5 21 21"></path></svg>
-              </span>
+
+            <div class="diary-filters">
+              <button class="filter-chip active" data-filter="all" type="button">全部</button>
+              <button class="filter-chip" data-filter="dabao" type="button">大宝的</button>
+              <button class="filter-chip" data-filter="xiaobao" type="button">小宝的</button>
+            </div>
+
+            <div id="diary-search" class="diary-search">
               <input id="diary-search-input" type="search" placeholder="搜索日记、心情、地点..." />
             </div>
+
             <div id="diary-list" class="timeline"></div>
           </section>
 
-          <section id="page-memory" class="page">
-            <header class="page-header">
-              <h1>记忆回溯</h1>
-              <p>特别日子写下的日记</p>
-            </header>
-            <div class="anniversary-box">
-              <label>
-                纪念日起点
-                <input id="anniversary-date" type="date" />
-              </label>
-              <button id="save-anniversary" class="outline-button" type="button">保存</button>
-            </div>
+          <section id="page-memory" class="page memory-page">
+            <h1 class="page-title plain-title">回忆</h1>
             <div id="memory-list" class="memory-list"></div>
           </section>
 
-          <section id="page-calendar" class="page">
-            <header class="page-header">
-              <h1>日历</h1>
-              <p>浏览每一天的记录</p>
-            </header>
+          <section id="page-calendar" class="page calendar-page">
+            <h1 class="page-title plain-title">日历</h1>
             <div class="calendar-card">
               <div class="calendar-title">
-                <button id="prev-month" class="icon-button" type="button">‹</button>
-                <h2 id="calendar-month">2026年 5月</h2>
-                <button id="next-month" class="icon-button" type="button">›</button>
+                <button id="prev-month" class="month-button" type="button" aria-label="上个月">‹</button>
+                <h2 id="calendar-month">2026年5月</h2>
+                <button id="next-month" class="month-button" type="button" aria-label="下个月">›</button>
               </div>
               <div class="weekdays">
                 <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
               </div>
               <div id="calendar-grid" class="calendar-grid"></div>
+              <div id="calendar-selected" class="calendar-selected"></div>
             </div>
           </section>
 
-          <section id="page-settings" class="page">
-            <div class="settings-card profile-card">
-              <div class="avatar">♙</div>
-              <div>
-                <div class="profile-name-row">
-                  <h2 id="profile-name">宝贝</h2>
-                  <button id="edit-name" class="text-icon" type="button">✎</button>
-                </div>
-                <p id="profile-email">email</p>
-              </div>
-            </div>
+          <section id="page-settings" class="page settings-page">
+            <h1 class="page-title plain-title settings-title">设置</h1>
 
-            <div class="settings-card">
-              <h3>我的日记颜色</h3>
-              <div id="color-picker" class="color-picker"></div>
-              <div class="stats">
-                <div><strong id="my-count">0</strong><span>篇日记</span></div>
-                <div><strong id="photo-count">0</strong><span>张照片</span></div>
-              </div>
-            </div>
-
-            <div class="settings-card">
-              <h3>♡ 情侣日记本</h3>
-              <div id="members-list" class="members-list"></div>
-              <label class="invite-box">
-                邀请码
-                <input id="book-code" readonly />
-              </label>
-              <label class="invite-box">
-                加入对方日记本
-                <div class="join-row">
-                  <input id="join-code" placeholder="粘贴对方邀请码" />
-                  <button id="join-book" type="button">加入</button>
-                </div>
-              </label>
-            </div>
-
-            <div class="settings-card">
+            <div class="theme-card">
               <h3>主题颜色</h3>
               <div class="theme-grid">
-                <button class="theme-chip active" data-theme="rose" type="button"><span></span>经典</button>
-                <button class="theme-chip" data-theme="pink" type="button"><span></span>玫粉</button>
-                <button class="theme-chip" data-theme="sakura" type="button"><span></span>樱粉</button>
-                <button class="theme-chip" data-theme="ink" type="button"><span></span>水墨</button>
-                <button class="theme-chip" data-theme="sea" type="button"><span></span>浅海</button>
+                <button class="theme-chip active" data-theme="rose" type="button" aria-label="经典"></button>
+                <button class="theme-chip" data-theme="pink" type="button" aria-label="玫粉"></button>
+                <button class="theme-chip" data-theme="sakura" type="button" aria-label="樱粉"></button>
+                <button class="theme-chip" data-theme="ink" type="button" aria-label="水墨"></button>
+                <button class="theme-chip" data-theme="sea" type="button" aria-label="浅海"></button>
               </div>
             </div>
 
-            <div class="settings-card export-card">
-              <div>
-                <h3>导出日记</h3>
-                <p>将当前日记本导出为 PDF 文件</p>
+            <div class="settings-list">
+              <button id="edit-name" class="setting-row" type="button">
+                <span class="setting-icon">👤</span>
+                <span><strong>更改显示名</strong><small><span id="profile-name">宝贝</span> · <span id="profile-email">管理个人信息</span></small></span>
+                <span class="chevron">›</span>
+              </button>
+              <div class="setting-row static-row">
+                <span class="setting-icon">📘</span>
+                <span><strong>日记统计</strong><small><span id="my-count">0</span> 篇日记 · <span id="photo-count">0</span> 张照片</small></span>
+                <span></span>
               </div>
-              <button id="export-pdf" class="outline-button" type="button">⇩ 导出 PDF</button>
+              <div class="setting-row static-row">
+                <span class="setting-icon">💙</span>
+                <span><strong>情侣日记本</strong><small id="members-list">共同记录</small></span>
+                <span></span>
+              </div>
+              <button id="dark-mode-toggle" class="setting-row" type="button">
+                <span class="setting-icon">🌙</span>
+                <span><strong>暗黑模式</strong><small id="dark-mode-status">已关闭</small></span>
+                <span class="switch" aria-hidden="true"><span></span></span>
+              </button>
+              <label class="setting-row input-row">
+                <span class="setting-icon">🔐</span>
+                <span><strong>邀请码</strong><input id="book-code" readonly /></span>
+              </label>
+              <label class="setting-row input-row join-setting">
+                <span class="setting-icon">➕</span>
+                <span><strong>加入对方日记本</strong><input id="join-code" placeholder="粘贴对方邀请码" /></span>
+                <button id="join-book" type="button">加入</button>
+              </label>
+              <button id="export-pdf" class="setting-row" type="button">
+                <span class="setting-icon">💾</span>
+                <span><strong>数据备份</strong><small>下载 JSON 备份</small></span>
+                <span class="chevron">›</span>
+              </button>
+              <button id="logout" class="setting-row" type="button">
+                <span class="setting-icon">❓</span>
+                <span><strong>退出登录</strong><small>Couple Diary for 满满</small></span>
+                <span class="chevron">›</span>
+              </button>
             </div>
 
-            <button id="logout" class="logout-button" type="button">退出登录</button>
-            <p class="footer-note">Developed for 满满</p>
+            <p class="footer-note">Couple Diary for 满满</p>
           </section>
         </div>
 
-        <button id="new-entry-button" class="floating-button" type="button" aria-label="写日记">✎</button>
-
         <nav class="tabbar">
           <button class="tab active" data-page="diary" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h6a3 3 0 0 1 3 3v12a3 3 0 0 0-3-3H5z"></path><path d="M19 4.5h-5a3 3 0 0 0-3 3v12a3 3 0 0 1 3-3h5z"></path></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 5.2h5.7c1.6 0 2.8 1.2 2.8 2.8v11.2c-.7-.9-1.7-1.3-3-1.3H4.5z"></path><path d="M19.5 5.2h-5.7C12.2 5.2 11 6.4 11 8v11.2c.7-.9 1.7-1.3 3-1.3h5.5z"></path></svg>
             <span>日记</span>
           </button>
           <button class="tab" data-page="memory" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 5.1L19 10l-5.4 1.9L12 17l-1.6-5.1L5 10l5.4-1.9z"></path><path d="M18.5 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z"></path></svg>
-            <span>回溯</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 8.7c0-2.3-1.8-4-4-4-1.8 0-3.1 1-4.5 2.6-1.4-1.6-2.7-2.6-4.5-2.6-2.2 0-4 1.7-4 4 0 4.5 6.2 8.6 8.5 10.4 2.3-1.8 8.5-5.9 8.5-10.4z"></path></svg>
+            <span>回忆</span>
           </button>
-          <button class="tab" data-page="calendar" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3"></path><path d="M17 3v3"></path><rect x="4" y="5" width="16" height="15" rx="3"></rect><path d="M4 10h16"></path><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path></svg>
+          <button class="tab framed" data-page="calendar" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 3.8v3"></path><path d="M16.5 3.8v3"></path><rect x="4.5" y="5.8" width="15" height="14" rx="3"></rect><path d="M4.5 10h15"></path></svg>
             <span>日历</span>
           </button>
-          <button class="tab" data-page="settings" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5z"></path><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2.2 2.2 0 1 1-3.11 3.11l-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.09 1.65v.15a2.2 2.2 0 1 1-4.4 0v-.08a1.8 1.8 0 0 0-1.18-1.68 1.8 1.8 0 0 0-1.98.36l-.05.05a2.2 2.2 0 1 1-3.11-3.11l.05-.05A1.8 1.8 0 0 0 3.3 15a1.8 1.8 0 0 0-1.65-1.09H1.5a2.2 2.2 0 1 1 0-4.4h.08A1.8 1.8 0 0 0 3.26 8.4a1.8 1.8 0 0 0-.36-1.98l-.05-.05A2.2 2.2 0 1 1 5.96 3.25l.05.05a1.8 1.8 0 0 0 1.98.36h.02A1.8 1.8 0 0 0 9.1 2V1.9a2.2 2.2 0 1 1 4.4 0v.08A1.8 1.8 0 0 0 14.6 3.66a1.8 1.8 0 0 0 1.98-.36l.05-.05a2.2 2.2 0 1 1 3.11 3.11l-.05.05a1.8 1.8 0 0 0-.36 1.98v.02A1.8 1.8 0 0 0 21 9.5h.1a2.2 2.2 0 1 1 0 4.4h-.08A1.8 1.8 0 0 0 19.4 15z"></path></svg>
+          <button class="tab framed" data-page="settings" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"></path><path d="M18.5 13.8c.1.4.3.8.6 1.1l.1.1a1.9 1.9 0 0 1-2.7 2.7l-.1-.1c-.3-.3-.7-.5-1.1-.6-.4.2-.8.3-1.2.5-.2.3-.3.8-.3 1.2v.2a1.9 1.9 0 0 1-3.8 0v-.2c0-.4-.1-.9-.3-1.2-.4-.1-.8-.3-1.2-.5-.4.1-.8.3-1.1.6l-.1.1A1.9 1.9 0 0 1 4.8 15l.1-.1c.3-.3.5-.7.6-1.1-.2-.4-.3-.8-.5-1.2-.3-.2-.8-.3-1.2-.3h-.2a1.9 1.9 0 0 1 0-3.8h.2c.4 0 .9-.1 1.2-.3.1-.4.3-.8.5-1.2-.1-.4-.3-.8-.6-1.1l-.1-.1a1.9 1.9 0 0 1 2.7-2.7l.1.1c.3.3.7.5 1.1.6.4-.2.8-.3 1.2-.5.2-.3.3-.8.3-1.2V2a1.9 1.9 0 0 1 3.8 0v.2c0 .4.1.9.3 1.2.4.1.8.3 1.2.5.4-.1.8-.3 1.1-.6l.1-.1a1.9 1.9 0 0 1 2.7 2.7l-.1.1c-.3.3-.5.7-.6 1.1.2.4.3.8.5 1.2.3.2.8.3 1.2.3h.2a1.9 1.9 0 0 1 0 3.8h-.2c-.4 0-.9.1-1.2.3-.1.4-.3.8-.5 1.2z"></path></svg>
             <span>设置</span>
           </button>
         </nav>
@@ -186,7 +180,7 @@
         </label>
         <label>
           内容
-          <textarea id="entry-content" required rows="8" placeholder="慢慢写，两个人都会看到。"></textarea>
+          <textarea id="entry-content" required rows="6" placeholder="慢慢写，两个人都会看到。"></textarea>
         </label>
         <label>
           照片
@@ -205,6 +199,20 @@
       </form>
     </dialog>
 
+    <dialog id="name-dialog" class="entry-dialog name-dialog">
+      <form id="name-form" method="dialog">
+        <header>
+          <h2>更改显示名</h2>
+          <button id="close-name-dialog" class="icon-button" type="button">×</button>
+        </header>
+        <label>
+          显示名
+          <input id="display-name-input" maxlength="12" placeholder="大宝 / 小宝" />
+        </label>
+        <button class="primary-button" type="submit">保存显示名</button>
+      </form>
+    </dialog>
+
     <div id="image-viewer" class="image-viewer hidden">
       <button id="close-image-viewer" class="image-close" type="button">×</button>
       <button id="prev-image" class="image-nav prev" type="button">‹</button>
@@ -213,6 +221,6 @@
       <div id="image-counter" class="image-counter"></div>
     </div>
 
-    <script src="./app.js?v=10"></script>
+    <script src="./app.js?v=22"></script>
   </body>
 </html>
