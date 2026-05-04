@@ -10,11 +10,16 @@ const state = {
   bookId: null,
   entries: [],
   members: [],
+  commentsByEntry: new Map(),
+  commentsShared: true,
+  anniversaries: [],
+  anniversariesShared: true,
   calendarDate: new Date(),
   selectedCalendarKey: formatDateKey(new Date()),
   diaryFilter: "all",
   darkMode: localStorage.getItem("coupleDiaryDarkMode") === "true",
   editingEntryId: null,
+  openCommentEntryId: null,
   collapsedGroups: new Set(),
   expandedEntries: new Set(),
   viewerPhotos: [],
@@ -63,6 +68,8 @@ function toDateTimeLocalValue(date) {
 }
 
 function defaultAnniversaryDate() {
+  const primaryAnniversary = state.anniversaries.find((item) => item.label.includes("在一起")) || state.anniversaries[0];
+  if (primaryAnniversary?.date) return primaryAnniversary.date;
   const oldestEntry = [...state.entries].sort((a, b) => new Date(a.entry_date) - new Date(b.entry_date))[0];
   return state.book?.anniversary_date || (oldestEntry ? formatDateKey(oldestEntry.entry_date) : formatDateKey(new Date()));
 }
@@ -134,12 +141,50 @@ function monthLabel(date) {
 }
 
 function escapeHtml(value = "") {
-  return value
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function storageKey(name) {
+  return `coupleDiary:${state.bookId || "local"}:${name}`;
+}
+
+function readStoredJson(name, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey(name)) || "null") ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredJson(name, value) {
+  localStorage.setItem(storageKey(name), JSON.stringify(value));
+}
+
+function safeDateLabel(date) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function commentsForEntry(entryId) {
+  return state.commentsByEntry.get(entryId) || [];
+}
+
+function displayMood(mood) {
+  const value = (mood || "").trim();
+  if (!value) return "";
+  if (["困", "【困】", "[困]"].includes(value)) return "😴";
+  return value.replaceAll("【困】", "😴").replaceAll("[困]", "😴");
+}
+
+function commentAuthorName(comment) {
+  const member = state.members.find((item) => item.user_id === comment.author_id);
+  return member?.profiles?.display_name || member?.profiles?.email || (comment.author_id === state.session?.user.id ? state.profile?.display_name : "对方") || "对方";
 }
 
 async function init() {
@@ -160,6 +205,7 @@ function bindEvents() {
   $("#auth-form").addEventListener("submit", handleAuth);
   $("#top-new-entry-button").addEventListener("click", openNewEntryDialog);
   $("#close-dialog").addEventListener("click", closeEntryDialog);
+  $("#cancel-entry").addEventListener("click", closeEntryDialog);
   $("#close-name-dialog").addEventListener("click", closeNameDialog);
   $("#entry-form").addEventListener("submit", saveEntry);
   $("#name-form").addEventListener("submit", saveDisplayName);
@@ -182,6 +228,9 @@ function bindEvents() {
   $("#join-book").addEventListener("click", joinBook);
   $("#export-pdf").addEventListener("click", exportPdf);
   $("#logout").addEventListener("click", logout);
+  $("#entry-dialog").addEventListener("click", (event) => {
+    if (event.target.id === "entry-dialog") closeEntryDialog();
+  });
 
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => showPage(button.dataset.page));
@@ -202,15 +251,26 @@ function bindEvents() {
     const entryToggle = event.target.closest("[data-toggle-entry]");
     const groupToggle = event.target.closest("[data-toggle-group]");
     const calendarDay = event.target.closest("[data-calendar-day]");
+    const commentToggle = event.target.closest("[data-toggle-comments]");
+    const deleteAnniversaryButton = event.target.closest("[data-delete-anniversary]");
     if (editButton) openEditEntryDialog(editButton.dataset.editEntry);
     if (deleteButton) deleteEntry(deleteButton.dataset.deleteEntry);
     if (imageButton) openImageViewer(imageButton.dataset.viewImage, imageButton.dataset.imageGroup);
     if (entryToggle) toggleEntry(entryToggle.dataset.toggleEntry);
     if (groupToggle) toggleGroup(groupToggle.dataset.toggleGroup);
+    if (commentToggle) toggleComments(commentToggle.dataset.toggleComments);
+    if (deleteAnniversaryButton) deleteAnniversary(deleteAnniversaryButton.dataset.deleteAnniversary);
     if (calendarDay) {
       state.selectedCalendarKey = calendarDay.dataset.calendarDay;
       renderCalendar();
     }
+  });
+
+  document.addEventListener("submit", (event) => {
+    const commentForm = event.target.closest("[data-comment-form]");
+    if (!commentForm) return;
+    event.preventDefault();
+    addComment(commentForm.dataset.commentForm, commentForm);
   });
 }
 
@@ -306,6 +366,7 @@ async function ensureBook() {
 
 async function loadAll() {
   await Promise.all([loadBook(), loadMembers(), loadEntries()]);
+  await Promise.all([loadComments(), loadAnniversaries()]);
   renderAll();
 }
 
@@ -342,6 +403,43 @@ async function loadEntries() {
     .order("entry_date", { ascending: false });
   if (error) throw error;
   state.entries = data || [];
+}
+
+async function loadComments() {
+  state.commentsByEntry = new Map();
+  const entryIds = state.entries.map((entry) => entry.id);
+  if (!entryIds.length) return;
+
+  const { data, error } = await client
+    .from("diary_comments")
+    .select("*")
+    .in("entry_id", entryIds)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    state.commentsShared = false;
+    const localComments = readStoredJson("comments", []);
+    localComments.forEach((comment) => {
+      if (!state.commentsByEntry.has(comment.entry_id)) state.commentsByEntry.set(comment.entry_id, []);
+      state.commentsByEntry.get(comment.entry_id).push(comment);
+    });
+    return;
+  }
+
+  state.commentsShared = true;
+  (data || []).forEach((comment) => {
+    if (!state.commentsByEntry.has(comment.entry_id)) state.commentsByEntry.set(comment.entry_id, []);
+    state.commentsByEntry.get(comment.entry_id).push(comment);
+  });
+}
+
+async function loadAnniversaries() {
+  const stored = readStoredJson("anniversaries", []);
+  const fromBook = Array.isArray(state.book?.anniversaries) ? state.book.anniversaries : [];
+  const legacy = state.book?.anniversary_date ? [{ id: "together", label: "在一起", date: state.book.anniversary_date }] : [];
+  const merged = fromBook.length ? fromBook : stored.length ? stored : legacy;
+  state.anniversaries = merged.filter((item) => item?.label && item?.date);
+  state.anniversariesShared = Array.isArray(state.book?.anniversaries);
 }
 
 function renderAll() {
@@ -433,7 +531,10 @@ function renderEntryCard(entry) {
   const isLong = entry.content.length > 220 || entry.content.split("\n").length > 5;
   const expanded = state.expandedEntries.has(entry.id);
   const preview = entry.content;
-  const meta = [entry.mood, entry.location].filter(Boolean).map(escapeHtml).join(" ");
+  const meta = [displayMood(entry.mood), entry.location].filter(Boolean).map(escapeHtml).join(" ");
+  const comments = commentsForEntry(entry.id);
+  const canComment = entry.author_id !== state.session?.user.id;
+  const canShowComments = canComment || comments.length > 0;
   return `
     <article class="entry-card">
       <div class="entry-date">
@@ -446,17 +547,30 @@ function renderEntryCard(entry) {
           <div class="author">
             <span class="author-badge" style="background:${profile.diary_color || "var(--primary)"}">${authorBadge(entry)}</span>
             ${meta ? `<span>${meta}</span>` : ""}
-            ${photos.length ? `<span>▧</span>` : ""}
           </div>
           ${
-            canEdit
+            canEdit || canShowComments
               ? `<div class="entry-actions">
+                  ${
+                    canShowComments
+                      ? `<button class="comment-toggle" data-toggle-comments="${entry.id}" type="button" aria-label="评论">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.2 8.2 0 0 1-8.4 8H6l-3 2 .9-4.5A8 8 0 1 1 21 11.5z"></path></svg>
+                          ${comments.length ? `<span>${comments.length}</span>` : ""}
+                        </button>`
+                      : ""
+                  }
+                  ${
+                    canEdit
+                      ? `
                   <button data-edit-entry="${entry.id}" type="button" aria-label="编辑日记">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"></path></svg>
                   </button>
                   <button data-delete-entry="${entry.id}" type="button" aria-label="删除日记">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 15H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
                   </button>
+                        `
+                      : ""
+                  }
                 </div>`
               : ""
           }
@@ -465,6 +579,85 @@ function renderEntryCard(entry) {
         <p class="${isLong && !expanded ? "entry-content collapsed-text" : "entry-content"}">${escapeHtml(preview)}</p>
         ${isLong ? `<button class="expand-button" data-toggle-entry="${entry.id}" type="button">${expanded ? "收起" : "展开"}</button>` : ""}
         ${photos.length ? `<div class="entry-photos">${photos.map((url) => `<button data-view-image="${escapeHtml(url)}" data-image-group="${entry.id}" type="button"><img src="${escapeHtml(url)}" alt="日记照片" /></button>`).join("")}</div>` : ""}
+        ${renderEntryComments(entry)}
+      </div>
+    </article>
+  `;
+}
+
+function renderEntryComments(entry) {
+  const comments = commentsForEntry(entry.id);
+  const canComment = entry.author_id !== state.session?.user.id;
+  const isOpen = state.openCommentEntryId === entry.id;
+  if (!isOpen) return "";
+  return `
+    <div class="comments">
+      ${
+        comments.length
+          ? `<div class="comment-list">${comments
+              .map(
+                (comment) => `
+                  <div class="comment-item">
+                    <p><strong>${escapeHtml(commentAuthorName(comment))}</strong>${escapeHtml(comment.content || "")}</p>
+                  </div>
+                `
+              )
+              .join("")}</div>`
+          : ""
+      }
+      ${
+        canComment
+          ? `<form class="comment-form" data-comment-form="${entry.id}">
+              <div class="comment-input-row">
+                <input name="content" placeholder="加一句评论..." maxlength="120" />
+                <button type="submit">发送</button>
+              </div>
+            </form>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function anniversaryNotice(item) {
+  const start = new Date(`${item.date}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let next = new Date(today.getFullYear(), start.getMonth(), start.getDate());
+  if (next < today) next = new Date(today.getFullYear() + 1, start.getMonth(), start.getDate());
+  const years = next.getFullYear() - start.getFullYear();
+  const days = Math.round((next - today) / 86400000);
+  const suffix = years > 0 ? `${years}周年` : "纪念日";
+  if (days === 0) return `今天是${item.label}${suffix}`;
+  return `距离${item.label}${suffix}还有 ${days} 天`;
+}
+
+function renderAnniversaryPanel() {
+  const items = state.anniversaries;
+  return `
+    <article class="memory-panel anniversary-panel">
+      <h3>纪念日提醒</h3>
+      <div class="anniversary-list">
+        ${
+          items.length
+            ? items
+                .map(
+                  (item) => `
+                    <div class="anniversary-item">
+                      <div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(safeDateLabel(item.date))} · ${escapeHtml(anniversaryNotice(item))}</span></div>
+                      <button data-delete-anniversary="${escapeHtml(item.id)}" type="button" aria-label="删除纪念日">×</button>
+                    </div>
+                  `
+                )
+                .join("")
+            : `<div class="anniversary-empty">添加“在一起”“认识”等纪念日后，这里会自动提示周年。</div>`
+        }
+      </div>
+      <div class="anniversary-tools custom-anniversary-tools">
+        <input id="anniversary-label" placeholder="比如 在一起 / 认识" />
+        <input id="anniversary-custom-date" type="date" />
+        <button id="save-custom-anniversary" type="button">保存</button>
       </div>
     </article>
   `;
@@ -525,13 +718,7 @@ function renderMemory() {
       </div>
     </article>
 
-    <article class="memory-panel">
-      <h3>纪念日起点</h3>
-      <div class="anniversary-tools">
-        <input id="anniversary-date" type="date" value="${escapeHtml(startDate)}" />
-        <button id="save-anniversary" type="button">保存</button>
-      </div>
-    </article>
+    ${renderAnniversaryPanel()}
 
     ${
       filtered
@@ -555,7 +742,7 @@ function renderMemory() {
     }
   `;
 
-  $("#save-anniversary")?.addEventListener("click", saveAnniversaryDate);
+  $("#save-custom-anniversary")?.addEventListener("click", saveCustomAnniversary);
 }
 
 function renderCalendar() {
@@ -610,7 +797,7 @@ function renderCalendarSelected() {
         ? entries
             .map((entry) => {
               const title = entry.title?.trim() || "这天的日记";
-              return `<article class="calendar-mini-entry"><h3><span class="author-badge">${authorBadge(entry)}</span> ${escapeHtml(title)}</h3><p>${escapeHtml((entry.content || "").slice(0, 42))}${entry.content?.length > 42 ? "..." : ""}</p></article>`;
+              return `<article class="calendar-mini-entry"><h3><span class="author-badge">${authorBadge(entry)}</span> ${escapeHtml(title)}</h3><p>${escapeHtml(entry.content || "")}</p></article>`;
             })
             .join("")
         : `<div class="calendar-mini-entry"><h3>这天还没有日记</h3><p>点右上角的加号，补写这一日。</p></div>`
@@ -663,6 +850,8 @@ function openNewEntryDialog() {
   $("#entry-form").reset();
   $("#entry-date").value = toDateTimeLocalValue(new Date());
   $("#photo-preview").innerHTML = "";
+  const photoLabel = $(".photo-upload-box span");
+  if (photoLabel) photoLabel.textContent = "选择照片";
   $("#entry-dialog").showModal();
 }
 
@@ -678,6 +867,8 @@ function openEditEntryDialog(entryId) {
   $("#entry-location").value = entry.location || "";
   $("#entry-photos").value = "";
   $("#photo-preview").innerHTML = (entry.photos || []).map((url) => `<img src="${escapeHtml(url)}" alt="已有照片" />`).join("");
+  const photoLabel = $(".photo-upload-box span");
+  if (photoLabel) photoLabel.textContent = "继续添加照片";
   $("#entry-dialog").showModal();
 }
 
@@ -696,6 +887,48 @@ async function saveAnniversaryDate() {
   }
   state.book = data;
   renderMemory();
+}
+
+async function saveCustomAnniversary() {
+  const label = $("#anniversary-label").value.trim();
+  const date = $("#anniversary-custom-date").value;
+  if (!label || !date) return;
+  const item = {
+    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    label,
+    date,
+  };
+  state.anniversaries = [...state.anniversaries, item];
+  await persistAnniversaries();
+  renderMemory();
+}
+
+async function deleteAnniversary(id) {
+  state.anniversaries = state.anniversaries.filter((item) => item.id !== id);
+  await persistAnniversaries();
+  renderMemory();
+}
+
+async function persistAnniversaries() {
+  writeStoredJson("anniversaries", state.anniversaries);
+  const primary = state.anniversaries.find((item) => item.label.includes("在一起")) || state.anniversaries[0];
+  const payload = { anniversaries: state.anniversaries };
+  if (primary?.date) payload.anniversary_date = primary.date;
+
+  const { data, error } = await client
+    .from("diary_books")
+    .update(payload)
+    .eq("id", state.bookId)
+    .select("*")
+    .single();
+
+  if (error) {
+    state.anniversariesShared = false;
+    return;
+  }
+
+  state.anniversariesShared = true;
+  state.book = data;
 }
 
 function toggleEntry(entryId) {
@@ -750,6 +983,8 @@ function closeEntryDialog() {
   state.editingEntryId = null;
   $("#entry-form").reset();
   $("#photo-preview").innerHTML = "";
+  const photoLabel = $(".photo-upload-box span");
+  if (photoLabel) photoLabel.textContent = "选择照片";
   $("#entry-dialog").close();
 }
 
@@ -757,9 +992,52 @@ function closeNameDialog() {
   $("#name-dialog").close();
 }
 
+function toggleComments(entryId) {
+  state.openCommentEntryId = state.openCommentEntryId === entryId ? null : entryId;
+  renderDiary();
+}
+
+async function addComment(entryId, form) {
+  const content = form.elements.content.value.trim();
+  if (!content) return;
+
+  const comment = {
+    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+    entry_id: entryId,
+    author_id: state.session.user.id,
+    content,
+    created_at: new Date().toISOString(),
+  };
+
+  if (state.commentsShared) {
+    const { data, error } = await client.from("diary_comments").insert(comment).select("*").single();
+    if (!error && data) {
+      addCommentToState(data);
+      form.reset();
+      renderDiary();
+      return;
+    }
+    state.commentsShared = false;
+  }
+
+  addCommentToState(comment);
+  const localComments = readStoredJson("comments", []);
+  localComments.push(comment);
+  writeStoredJson("comments", localComments);
+  form.reset();
+  renderDiary();
+}
+
+function addCommentToState(comment) {
+  if (!state.commentsByEntry.has(comment.entry_id)) state.commentsByEntry.set(comment.entry_id, []);
+  state.commentsByEntry.get(comment.entry_id).push(comment);
+}
+
 function previewSelectedPhotos() {
   const files = Array.from($("#entry-photos").files || []);
   $("#photo-preview").innerHTML = files.map((file) => `<span>${escapeHtml(file.name)}</span>`).join("");
+  const label = $(".photo-upload-box span");
+  if (label) label.textContent = files.length ? `已选择 ${files.length} 张照片` : "选择照片";
 }
 
 async function uploadPhotos() {
@@ -852,6 +1130,8 @@ function exportPdf() {
     book: state.book,
     profile: state.profile,
     members: state.members,
+    anniversaries: state.anniversaries,
+    comments: Array.from(state.commentsByEntry.values()).flat(),
     entries: state.entries,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });

@@ -18,14 +18,25 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  min-height: 100%;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
+  width: 100%;
   min-height: 100vh;
-  background: #0b0b0c;
+  min-height: 100dvh;
+  background: var(--bg);
   color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   font-size: 15px;
   line-height: 1.42;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 body.dark-mode {
@@ -61,19 +72,21 @@ p {
 }
 
 .phone-shell {
-  width: min(100vw, 390px);
+  width: 100%;
   min-height: 100vh;
-  margin: 0 auto;
+  min-height: 100dvh;
+  margin: 0;
   background: var(--bg);
-  border: 1px solid #202124;
-  border-radius: 22px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
 }
 
 .screen {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .hidden {
@@ -180,6 +193,8 @@ select {
   color: var(--text);
   padding: 11px 13px;
   outline: 2px solid transparent;
+  font-size: 16px;
+  font-weight: 400;
 }
 
 textarea {
@@ -203,6 +218,22 @@ select:focus {
   font-weight: 850;
 }
 
+.secondary-button {
+  height: 46px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--card-soft);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .message {
   min-height: 18px;
   color: var(--primary);
@@ -217,8 +248,10 @@ select:focus {
 
 .content {
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
-  padding: 14px 12px 68px;
+  padding: 14px max(12px, env(safe-area-inset-right)) calc(68px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  -webkit-overflow-scrolling: touch;
 }
 
 .page {
@@ -322,7 +355,7 @@ select:focus {
   height: 38px;
   border-radius: 14px;
   background: var(--card);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .timeline {
@@ -466,6 +499,7 @@ select:focus {
 .memory-card p {
   color: var(--muted);
   font-size: 12.5px;
+  font-weight: 400;
   line-height: 1.44;
   margin: 0;
   white-space: pre-wrap;
@@ -520,6 +554,7 @@ select:focus {
 }
 
 .entry-actions button {
+  position: relative;
   border: 0;
   background: var(--card-soft);
   color: var(--muted);
@@ -531,6 +566,22 @@ select:focus {
   place-items: center;
 }
 
+.entry-actions button span {
+  position: absolute;
+  right: -3px;
+  top: -4px;
+  min-width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  font-weight: 850;
+  padding: 0 3px;
+}
+
 .entry-actions svg {
   width: 13px;
   height: 13px;
@@ -539,6 +590,93 @@ select:focus {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
+}
+
+.comments {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 5px;
+}
+
+.comment-item {
+  background: var(--card-soft);
+  border-radius: 12px;
+  padding: 7px 8px;
+}
+
+.comment-item p {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.comment-item strong {
+  color: var(--text);
+  font-weight: 800;
+  margin-right: 5px;
+}
+
+.comment-form {
+  display: grid;
+  gap: 6px;
+}
+
+.comment-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.comment-input-row input {
+  height: 34px;
+  border-radius: 12px;
+  padding: 7px 10px;
+  font-size: 16px;
+}
+
+.comment-input-row button {
+  border: 0;
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-upload-box {
+  min-height: 42px;
+  border-radius: 15px;
+  background: var(--card-soft);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.photo-upload-box svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .memory-page,
@@ -669,6 +807,52 @@ select:focus {
   gap: 8px;
 }
 
+.custom-anniversary-tools {
+  grid-template-columns: 1fr 1fr auto;
+  margin-top: 10px;
+}
+
+.anniversary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.anniversary-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-soft);
+  border-radius: 14px;
+  padding: 9px 10px;
+}
+
+.anniversary-item strong,
+.anniversary-item span {
+  display: block;
+}
+
+.anniversary-item strong {
+  font-size: 13px;
+}
+
+.anniversary-item span,
+.anniversary-empty {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.anniversary-item button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
 .anniversary-tools input,
 .anniversary-tools button {
   height: 36px;
@@ -782,7 +966,7 @@ select:focus {
   border-top: 1px solid var(--line);
   margin-top: 20px;
   padding-top: 18px;
-  color: #68707b;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -801,6 +985,7 @@ select:focus {
 
 .calendar-mini-entry p {
   font-size: 12px;
+  white-space: pre-wrap;
   margin: 0;
 }
 
@@ -956,17 +1141,17 @@ select:focus {
 
 .tabbar {
   position: fixed;
-  left: 50%;
+  left: 0;
   bottom: 0;
-  transform: translateX(-50%);
-  width: min(100vw, 390px);
-  height: 54px;
+  transform: none;
+  width: 100%;
+  height: calc(54px + env(safe-area-inset-bottom));
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
   background: rgba(255, 255, 255, 0.97);
   border-top: 1px solid var(--line);
-  padding: 2px 10px 4px;
+  padding: 2px 10px calc(4px + env(safe-area-inset-bottom));
   z-index: 4;
 }
 
@@ -1004,8 +1189,10 @@ select:focus {
 }
 
 .entry-dialog {
-  width: min(100vw, 390px);
+  width: 100%;
+  max-width: none;
   max-height: 92vh;
+  max-height: 92dvh;
   border: 0;
   border-radius: 26px 26px 0 0;
   padding: 0;
@@ -1019,7 +1206,7 @@ select:focus {
 }
 
 .entry-dialog form {
-  padding: 20px 18px 22px;
+  padding: 20px max(18px, env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
 }
 
 .entry-dialog header {
@@ -1132,22 +1319,32 @@ select:focus {
 
 @media (min-width: 561px) {
   .phone-shell {
+    width: min(100vw, 430px);
     min-height: min(100vh, 780px);
+    margin: 0 auto;
+    border-radius: 22px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  }
+
+  .tabbar,
+  .entry-dialog {
+    left: 50%;
+    width: min(100vw, 430px);
+    transform: translateX(-50%);
   }
 }
 
 @media (max-width: 390px) {
-  .phone-shell,
-  .tabbar,
-  .entry-dialog {
-    width: 100vw;
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
-  }
-
   .content {
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  .custom-anniversary-tools {
+    grid-template-columns: 1fr auto;
+  }
+
+  .custom-anniversary-tools input[type="date"] {
+    grid-column: 1 / -1;
   }
 }

@@ -2,9 +2,9 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <title>情侣日记本</title>
-    <link rel="stylesheet" href="./styles.css?v=22" />
+    <link rel="stylesheet" href="./styles.css?v=25" />
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="./config.js?v=1"></script>
   </head>
@@ -184,7 +184,11 @@
         </label>
         <label>
           照片
-          <input id="entry-photos" type="file" accept="image/*" multiple />
+          <span class="photo-upload-box">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 17.5 9 13l3 3 2.5-2.5 5 5"></path><rect x="3.5" y="4.5" width="17" height="15" rx="4"></rect><circle cx="9" cy="9" r="1.5"></circle></svg>
+            <span>选择照片</span>
+          </span>
+          <input id="entry-photos" class="file-input" type="file" accept="image/*" multiple />
         </label>
         <div id="photo-preview" class="photo-preview"></div>
         <label>
@@ -195,7 +199,10 @@
           地点
           <input id="entry-location" placeholder="可不填" />
         </label>
-        <button class="primary-button" type="submit">保存日记</button>
+        <div class="dialog-actions">
+          <button id="cancel-entry" class="secondary-button" type="button">取消</button>
+          <button class="primary-button" type="submit">保存日记</button>
+        </div>
       </form>
     </dialog>
 
@@ -221,6 +228,6 @@
       <div id="image-counter" class="image-counter"></div>
     </div>
 
-    <script src="./app.js?v=22"></script>
+    <script src="./app.js?v=25"></script>
   </body>
 </html>
