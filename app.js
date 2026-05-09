@@ -12,6 +12,7 @@ const state = {
   members: [],
   commentsByEntry: new Map(),
   commentsShared: true,
+  readCommentCounts: {},
   anniversaries: [],
   anniversariesShared: true,
   calendarDate: new Date(),
@@ -173,6 +174,17 @@ function safeDateLabel(date) {
 
 function commentsForEntry(entryId) {
   return state.commentsByEntry.get(entryId) || [];
+}
+
+function unreadCommentCount(entryId) {
+  const comments = commentsForEntry(entryId);
+  const readCount = state.readCommentCounts[entryId] || 0;
+  return Math.max(0, comments.length - readCount);
+}
+
+function markCommentsRead(entryId) {
+  state.readCommentCounts[entryId] = commentsForEntry(entryId).length;
+  writeStoredJson("readCommentCounts", state.readCommentCounts);
 }
 
 function displayMood(mood) {
@@ -367,6 +379,7 @@ async function ensureBook() {
 async function loadAll() {
   await Promise.all([loadBook(), loadMembers(), loadEntries()]);
   await Promise.all([loadComments(), loadAnniversaries()]);
+  state.readCommentCounts = readStoredJson("readCommentCounts", {});
   renderAll();
 }
 
@@ -533,6 +546,7 @@ function renderEntryCard(entry) {
   const preview = entry.content;
   const meta = [displayMood(entry.mood), entry.location].filter(Boolean).map(escapeHtml).join(" ");
   const comments = commentsForEntry(entry.id);
+  const unreadComments = unreadCommentCount(entry.id);
   const canComment = entry.author_id !== state.session?.user.id;
   const canShowComments = canComment || comments.length > 0;
   return `
@@ -555,7 +569,7 @@ function renderEntryCard(entry) {
                     canShowComments
                       ? `<button class="comment-toggle" data-toggle-comments="${entry.id}" type="button" aria-label="评论">
                           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.2 8.2 0 0 1-8.4 8H6l-3 2 .9-4.5A8 8 0 1 1 21 11.5z"></path></svg>
-                          ${comments.length ? `<span>${comments.length}</span>` : ""}
+                          ${comments.length ? `<span class="comment-count ${unreadComments ? "unread" : "read"}">${comments.length}</span>` : ""}
                         </button>`
                       : ""
                   }
@@ -824,15 +838,16 @@ async function saveEntry(event) {
   const photos = [...(existing?.photos || []), ...uploadedPhotos];
   const payload = { title, content, location: location || null, photos, mood: mood || null, entry_date: new Date(entryDate).toISOString() };
 
+  const isNewEntry = !state.editingEntryId;
   const query = state.editingEntryId
-    ? client.from("diary_entries").update(payload).eq("id", state.editingEntryId)
+    ? client.from("diary_entries").update(payload).eq("id", state.editingEntryId).select("*").single()
     : client.from("diary_entries").insert({
         ...payload,
         book_id: state.bookId,
         author_id: state.session.user.id,
-      });
+      }).select("*").single();
 
-  const { error } = await query;
+  const { data: savedEntry, error } = await query;
 
   if (error) {
     alert(error.message);
@@ -842,6 +857,7 @@ async function saveEntry(event) {
   closeEntryDialog();
   await loadAll();
   showPage("diary");
+  if (isNewEntry) sendEmailNotification("entry", savedEntry);
 }
 
 function openNewEntryDialog() {
@@ -993,7 +1009,9 @@ function closeNameDialog() {
 }
 
 function toggleComments(entryId) {
-  state.openCommentEntryId = state.openCommentEntryId === entryId ? null : entryId;
+  const shouldOpen = state.openCommentEntryId !== entryId;
+  state.openCommentEntryId = shouldOpen ? entryId : null;
+  if (shouldOpen) markCommentsRead(entryId);
   renderDiary();
 }
 
@@ -1015,6 +1033,7 @@ async function addComment(entryId, form) {
       addCommentToState(data);
       form.reset();
       renderDiary();
+      sendEmailNotification("comment", data);
       return;
     }
     state.commentsShared = false;
@@ -1026,11 +1045,29 @@ async function addComment(entryId, form) {
   writeStoredJson("comments", localComments);
   form.reset();
   renderDiary();
+  sendEmailNotification("comment", comment);
 }
 
 function addCommentToState(comment) {
   if (!state.commentsByEntry.has(comment.entry_id)) state.commentsByEntry.set(comment.entry_id, []);
   state.commentsByEntry.get(comment.entry_id).push(comment);
+}
+
+async function sendEmailNotification(type, payload) {
+  try {
+    await client.functions.invoke("send-diary-notification", {
+      body: {
+        type,
+        actorName: state.profile?.display_name || "对方",
+        message: `${state.profile?.display_name || "对方"}又写了新${type === "entry" ? "日记" : "评论"}`,
+        bookId: state.bookId,
+        entryId: payload?.entry_id || payload?.id,
+        commentId: type === "comment" ? payload?.id : null,
+      },
+    });
+  } catch (error) {
+    console.warn("Email notification skipped:", error.message || error);
+  }
 }
 
 function previewSelectedPhotos() {

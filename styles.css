@@ -498,9 +498,9 @@ select:focus {
 .entry-body p,
 .memory-card p {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 400;
-  line-height: 1.44;
+  line-height: 1.5;
   margin: 0;
   white-space: pre-wrap;
 }
@@ -566,20 +566,29 @@ select:focus {
   place-items: center;
 }
 
-.entry-actions button span {
+.comment-count {
   position: absolute;
   right: -3px;
   top: -4px;
   min-width: 13px;
   height: 13px;
   border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
   display: grid;
   place-items: center;
   font-size: 8px;
   font-weight: 850;
   padding: 0 3px;
+}
+
+.comment-count.unread {
+  background: var(--primary);
+  color: #fff;
+}
+
+.comment-count.read {
+  background: var(--card-soft);
+  color: var(--soft-muted);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .entry-actions svg {
@@ -610,8 +619,8 @@ select:focus {
 }
 
 .comment-item p {
-  font-size: 11.5px;
-  line-height: 1.35;
+  font-size: 12.5px;
+  line-height: 1.42;
 }
 
 .comment-item strong {
@@ -984,7 +993,7 @@ select:focus {
 }
 
 .calendar-mini-entry p {
-  font-size: 12px;
+  font-size: 13.5px;
   white-space: pre-wrap;
   margin: 0;
 }
